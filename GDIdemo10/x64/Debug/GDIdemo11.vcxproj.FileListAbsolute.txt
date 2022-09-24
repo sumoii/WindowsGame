@@ -1,0 +1,2 @@
+C:\Game\WindowsGame\GDIdemo11\x64\Debug\GDIdemo11.exe
+C:\Game\WindowsGame\GDIdemo10\x64\Debug\GDIdemo11.exe
