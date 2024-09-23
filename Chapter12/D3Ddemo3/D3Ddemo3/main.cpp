@@ -1,6 +1,6 @@
 //-----------------------------------【程序说明】----------------------------------------------
 //  程序名称:：D3Ddemo3
-//	 2013年4月 Create by sumoii
+//	 2024年9月 Create by sumoii
 //  描述：Direct3D顶点缓存的逆袭 示例程序
 //------------------------------------------------------------------------------------------------
 
@@ -200,7 +200,7 @@ HRESULT Direct3D_Init(HWND hwnd)
 
 	SAFE_RELEASE(pD3D) //LPDIRECT3D9接口对象的使命完成，我们将其释放掉
 
-		if (!(S_OK == Objects_Init(hwnd))) return E_FAIL;     //调用一次Objects_Init，进行渲染资源的初始化
+	if (!(S_OK == Objects_Init(hwnd))) return E_FAIL;     //调用一次Objects_Init，进行渲染资源的初始化
 	return S_OK;
 }
 

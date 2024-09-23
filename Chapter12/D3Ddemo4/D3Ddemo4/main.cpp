@@ -350,9 +350,9 @@ float Get_FPS()
 void Direct3D_CleanUp()
 {
 	//释放COM接口对象
-	SAFE_RELEASE(g_pIndexBuffer)
-		SAFE_RELEASE(g_pVertexBuffer)
-		SAFE_RELEASE(g_pFont)
-		SAFE_RELEASE(g_pd3dDevice)
+	SAFE_RELEASE(g_pIndexBuffer);
+	SAFE_RELEASE(g_pVertexBuffer);
+	SAFE_RELEASE(g_pFont);
+	SAFE_RELEASE(g_pd3dDevice);
 }
 

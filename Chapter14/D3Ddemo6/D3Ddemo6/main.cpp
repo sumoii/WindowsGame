@@ -1,8 +1,9 @@
-//-----------------------------------【程序说明】---------------------------------------------
-//  程序名称:：D3Ddemo5
+//-----------------------------------【程序说明】----------------------------------------------
+//  程序名称:：D3Ddemo6
 //	 2024年9月 Create by sumoii
-//  描述：迈向三维世界：Direct3D四大变换 示例程序
-//--------------------------------------------------------------------------------------------
+//  描述：Direct3D中几种几何体的快捷绘制 示例程序
+//	 程序运行说明： 按键盘上数字键“1”键和“2”键可以在线框填充模式和实体填充模式之间切换。默认情况下是线框填充
+//------------------------------------------------------------------------------------------------
 
 //-----------------------------------【头文件包含部分】---------------------------------------
 //	描述：包含程序所依赖的头文件
@@ -23,19 +24,8 @@
 //------------------------------------------------------------------------------------------------
 #define WINDOW_WIDTH	800							//为窗口宽度定义的宏，以方便在此处修改窗口宽度
 #define WINDOW_HEIGHT	600							//为窗口高度定义的宏，以方便在此处修改窗口高度
-#define WINDOW_TITLE	L"【致我们永不熄灭的游戏开发梦想】迈向三维世界：Direct3D四大变换  示例程序"	//为窗口标题定义的宏
+#define WINDOW_TITLE	L"【致我们永不熄灭的游戏开发梦想】Direct3D中几种几何体的快捷绘制 示例程序"	//为窗口标题定义的宏
 #define SAFE_RELEASE(p) { if(p) { (p)->Release(); (p)=NULL; } }   //定义一个安全释放宏，便于后面COM接口指针的释放
-
-
-//------------------------------------------------------------------------------------------------
-// 【顶点缓存使用四步曲之一】：设计顶点格式
-//------------------------------------------------------------------------------------------------
-struct CUSTOMVERTEX
-{
-	FLOAT x, y, z;
-	DWORD color;
-};
-#define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZ|D3DFVF_DIFFUSE)  //FVF灵活顶点格式
 
 //-----------------------------------【全局变量声明部分】-------------------------------------
 //	描述：全局变量的声明
@@ -44,8 +34,9 @@ LPDIRECT3DDEVICE9					g_pd3dDevice = NULL; //Direct3D设备对象
 ID3DXFont* g_pFont = NULL;    //字体COM接口
 float											g_FPS = 0.0f;       //一个浮点型的变量，代表帧速率
 wchar_t										g_strFPS[50];    //包含帧速率的字符数组
-LPDIRECT3DVERTEXBUFFER9		g_pVertexBuffer = NULL;    //顶点缓冲区对象
-LPDIRECT3DINDEXBUFFER9		g_pIndexBuffer = NULL;    // 索引缓存对象
+LPD3DXMESH g_teapot = NULL,g_cube=NULL,g_sphere=NULL,g_torus=NULL;
+D3DXMATRIX g_WorldMatrix[4]; //定义一些全局的世界矩阵
+D3DXMATRIX R;//定义一些全局的世界矩阵
 
 
 //-----------------------------------【全局函数声明部分】-------------------------------------
@@ -72,7 +63,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	wndClass.cbClsExtra = 0;								//窗口类的附加内存，取0就可以了
 	wndClass.cbWndExtra = 0;							//窗口的附加内存，依然取0就行了
 	wndClass.hInstance = hInstance;						//指定包含窗口过程的程序的实例句柄。
-	wndClass.hIcon = (HICON)::LoadImage(NULL, L"../../../../resource/Chapter13/D3Ddemo5/icon.ico", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);  //本地加载自定义ico图标
+	wndClass.hIcon = (HICON)::LoadImage(NULL, L"../../../../resource/Chapter14/D3Ddemo6/icon.ico", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);  //本地加载自定义ico图标
 	wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);    //指定窗口类的光标句柄。
 	wndClass.hbrBackground = (HBRUSH)GetStockObject(GRAY_BRUSH);  //为hbrBackground成员指定一个白色画刷句柄	
 	wndClass.lpszMenuName = NULL;						//用一个以空终止的字符串，指定菜单资源的名字。
@@ -98,7 +89,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ShowWindow(hwnd, nShowCmd);    //调用ShowWindow函数来显示窗口
 	UpdateWindow(hwnd);						//对窗口进行更新，就像我们买了新房子要装修一样
 
-	PlaySound(L"../../../../resource/Chapter13/D3Ddemo5/永遠の誓い.wav", NULL, SND_FILENAME | SND_ASYNC | SND_LOOP); //循环播放背景音乐 
+	PlaySound(L"../../../../resource/Chapter14/D3Ddemo6/君がいるから (Long Version).wav", NULL, SND_FILENAME | SND_ASYNC | SND_LOOP); //循环播放背景音乐 
 
 	//【5】消息循环过程
 	MSG msg = { 0 };  //初始化msg
@@ -209,11 +200,7 @@ HRESULT Direct3D_Init(HWND hwnd)
 	g_pd3dDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_CCW);   //开启背面消隐
 
 	return S_OK;
-
-
 }
-
-
 
 //-----------------------------------【Object_Init( )函数】--------------------------------------
 //	描述：渲染资源初始化函数，在此函数中进行要被渲染的物体的资源的初始化
@@ -226,96 +213,39 @@ HRESULT Objects_Init(HWND hwnd)
 		return E_FAIL;
 	srand(timeGetTime());      //用系统时间初始化随机种子 
 
-	//--------------------------------------------------------------------------------------
-	// 【顶点缓存、索引缓存绘图四步曲之二】：创建顶点缓存和索引缓存
-	//--------------------------------------------------------------------------------------
-	//创建顶点缓存
-	if (FAILED(g_pd3dDevice->CreateVertexBuffer(8 * sizeof(CUSTOMVERTEX),
-		0, D3DFVF_CUSTOMVERTEX,
-		D3DPOOL_DEFAULT, &g_pVertexBuffer, NULL)))
-	{
-		return E_FAIL;
-	}
-	// 创建索引缓存
-	if (FAILED(g_pd3dDevice->CreateIndexBuffer(36 * sizeof(WORD), 0,
-		D3DFMT_INDEX16, D3DPOOL_DEFAULT, &g_pIndexBuffer, NULL)))
-	{
-		return E_FAIL;
+	// 物体的创建
+	if (FAILED(D3DXCreateBox(g_pd3dDevice, 2, 2, 2, &g_cube, NULL)))	//立方体的创建
+		return false;
+	if (FAILED(D3DXCreateTeapot(g_pd3dDevice, &g_teapot, NULL)))		//茶壶的创建
+		return false;
+	if (FAILED(D3DXCreateSphere(g_pd3dDevice, 1.5, 25, 25,					//球面体的创建
+		&g_sphere, NULL))) return false;
+	if (FAILED(D3DXCreateTorus(g_pd3dDevice, 0.5f, 1.2f, 25, 25,				//圆环体的创建
+		&g_torus, NULL))) return false;
 
-	}
-	//--------------------------------------------------------------------------------------
-	// 【顶点缓存、索引缓存绘图四步曲之三】：访问顶点缓存和索引缓存
-	//--------------------------------------------------------------------------------------
-	//顶点数据的设置，
-	CUSTOMVERTEX Vertices[] =
-	{
-		{ -20.0f, 20.0f, -20.0f,  D3DCOLOR_XRGB(rand() % 256, rand() % 256, rand() % 256) },
-		{ -20.0f, 20.0f, 20.0f,  D3DCOLOR_XRGB(rand() % 256, rand() % 256, rand() % 256) },
-		{ 20.0f, 20.0f, 20.0f,  D3DCOLOR_XRGB(rand() % 256, rand() % 256, rand() % 256) },
-		{ 20.0f, 20.0f, -20.0f,  D3DCOLOR_XRGB(rand() % 256, rand() % 256, rand() % 256) },
-		{ -20.0f, -20.0f, -20.0f, D3DCOLOR_XRGB(rand() % 256, rand() % 256, rand() % 256) },
-		{ -20.0f, -20.0f, 20.0f, D3DCOLOR_XRGB(rand() % 256, rand() % 256, rand() % 256) },
-		{ 20.0f, -20.0f, 20.0f, D3DCOLOR_XRGB(rand() % 256, rand() % 256, rand() % 256) },
-		{ 20.0f, -20.0f, -20.0f, D3DCOLOR_XRGB(rand() % 256, rand() % 256, rand() % 256) },
-
-	};
-
-	//填充顶点缓存
-	VOID* pVertices;
-	if (FAILED(g_pVertexBuffer->Lock(0, sizeof(Vertices), (void**)&pVertices, 0)))
-		return E_FAIL;
-	memcpy(pVertices, Vertices, sizeof(Vertices));
-	g_pVertexBuffer->Unlock();
-
-	// 填充索引数据
-	WORD* pIndices = NULL;
-	g_pIndexBuffer->Lock(0, 0, (void**)&pIndices, 0);
-
-	// 顶面
-	pIndices[0] = 0, pIndices[1] = 1, pIndices[2] = 2;
-	pIndices[3] = 0, pIndices[4] = 2, pIndices[5] = 3;
-	// 正面
-	pIndices[6] = 0, pIndices[7] = 3, pIndices[8] = 7;
-	pIndices[9] = 0, pIndices[10] = 7, pIndices[11] = 4;
-	// 左侧面
-	pIndices[12] = 0, pIndices[13] = 4, pIndices[14] = 5;
-	pIndices[15] = 0, pIndices[16] = 5, pIndices[17] = 1;
-	// 右侧面
-	pIndices[18] = 2, pIndices[19] = 6, pIndices[20] = 7;
-	pIndices[21] = 2, pIndices[22] = 7, pIndices[23] = 3;
-	// 背面
-	pIndices[24] = 2, pIndices[25] = 5, pIndices[26] = 6;
-	pIndices[27] = 2, pIndices[28] = 1, pIndices[29] = 5;
-	// 底面
-	pIndices[30] = 4, pIndices[31] = 6, pIndices[32] = 5;
-	pIndices[33] = 4, pIndices[34] = 7, pIndices[35] = 6;
-	g_pIndexBuffer->Unlock();
+	// 设置渲染状态
+	g_pd3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);   //关闭光照
+	g_pd3dDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_CCW);   //开启背面消隐
+	g_pd3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);  //设置线框填充模式
 
 	return S_OK;
 }
 
-
 //-----------------------------------【Matrix_Set( )函数】--------------------------------------
 //	描述：封装了Direct3D四大变换的函数，即世界变换，取景变换，投影变换，视口变换的设置
-//----------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 VOID Matrix_Set()
 {
 	//--------------------------------------------------------------------------------------
-	//【四大变换之一】：世界变换矩阵的设置`
+	//【四大变换之一】：世界变换矩阵的设置
 	//--------------------------------------------------------------------------------------
-	D3DXMATRIX matWorld, Rx, Ry, Rz;
-	D3DXMatrixIdentity(&matWorld);                  // 单位化世界矩阵
-	D3DXMatrixRotationX(&Rx, D3DX_PI * (::timeGetTime() / 1000.0f));    // 绕X轴旋转
-	D3DXMatrixRotationY(&Ry, D3DX_PI * (::timeGetTime() / 1000.0f / 2));    // 绕Y轴旋转
-	D3DXMatrixRotationZ(&Rz, D3DX_PI * (::timeGetTime() / 1000.0f / 3));   // 绕Z轴旋转
-	matWorld = Rx * Ry * Rz * matWorld;             // 得到最终的组合矩阵
-	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matWorld);  //设置世界变换矩阵
+
 
 	//--------------------------------------------------------------------------------------
 	//【四大变换之二】：取景变换矩阵的设置
 	//--------------------------------------------------------------------------------------
 	D3DXMATRIX matView; //定义一个矩阵
-	D3DXVECTOR3 vEye(0.0f, 0.0f, 200.0f);  //摄像机的位置
+	D3DXVECTOR3 vEye(0.0f, 0.0f, -15.0f);  //摄像机的位置
 	D3DXVECTOR3 vAt(0.0f, 0.0f, 0.0f); //观察点的位置
 	D3DXVECTOR3 vUp(0.0f, 1.0f, 0.0f);//向上的向量
 	D3DXMatrixLookAtLH(&matView, &vEye, &vAt, &vUp); //计算出取景变换矩阵
@@ -339,7 +269,6 @@ VOID Matrix_Set()
 	vp.MinZ = 0.0f; //视口在深度缓存中的最小深度值
 	vp.MaxZ = 1.0f;	//视口在深度缓存中的最大深度值
 	g_pd3dDevice->SetViewport(&vp); //视口的设置
-
 }
 
 //-----------------------------------【Direct3D_Render( )函数】-------------------------------
@@ -350,7 +279,7 @@ void Direct3D_Render(HWND hwnd)
 	//--------------------------------------------------------------------------------------
 	// 【Direct3D渲染五步曲之一】：清屏操作
 	//--------------------------------------------------------------------------------------
-	g_pd3dDevice->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(255, 214, 158), 1.0f, 0);
+	g_pd3dDevice->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
 
 	//定义一个矩形，用于获取主窗口矩形
 	RECT formatRect;
@@ -360,28 +289,48 @@ void Direct3D_Render(HWND hwnd)
 	//--------------------------------------------------------------------------------------
 	g_pd3dDevice->BeginScene();                     // 开始绘制
 
+	Matrix_Set();//调用封装了四大变换的函数，对Direct3D世界变换，取景变换，投影变换，视口变换进行设置
+
+	// 获取键盘消息并给予设置相应的填充模式
+	if (::GetAsyncKeyState(0x31) & 0x8000f)         // 若数字键1被按下，进行实体填充
+		g_pd3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
+	if (::GetAsyncKeyState(0x32) & 0x8000f)         // 若数字键2被按下，进行线框填充
+		g_pd3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
+
 	//--------------------------------------------------------------------------------------
 	// 【Direct3D渲染五步曲之三】：正式绘制，利用顶点缓存绘制图形
 	//--------------------------------------------------------------------------------------
-	//----------------------------------------------------------------
-	// 【顶点缓存、索引缓存绘图四步曲之四】：绘制图形
-	//----------------------------------------------------------------
 
-	Matrix_Set();//调用封装了四大变换的函数，对Direct3D世界变换，取景变换，投影变换，视口变换进行设置
-	// 获取键盘消息并给予设置相应的填充模式
-	if (::GetAsyncKeyState(0x31) & 0x8000f)         // 若数字键1被按下，进行线框填充
-		g_pd3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
-	if (::GetAsyncKeyState(0x32) & 0x8000f)         // 若数字键2被按下，进行实体填充
-		g_pd3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
+	D3DXMatrixRotationY(&R, ::timeGetTime() / 1440.0f);  //设置公转的矩阵
 
-	g_pd3dDevice->SetStreamSource(0, g_pVertexBuffer, 0, sizeof(CUSTOMVERTEX));//把包含的几何体信息的顶点缓存和渲染流水线相关联
-	g_pd3dDevice->SetFVF(D3DFVF_CUSTOMVERTEX);//指定我们使用的灵活顶点格式的宏名称
-	g_pd3dDevice->SetIndices(g_pIndexBuffer);//设置索引缓存
-	g_pd3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 8, 0, 12);//利用索引缓存配合顶点缓存绘制图形
+	// 进行立方体的绘制
+	D3DXMatrixTranslation(&g_WorldMatrix[0], 3.0f, -3.0f, 0.0f);
+	g_WorldMatrix[0] = g_WorldMatrix[0] * R;
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &g_WorldMatrix[0]);
+	g_cube->DrawSubset(0);
+
+	//进行茶壶的绘制
+	D3DXMatrixTranslation(&g_WorldMatrix[1], -3.0f, -3.0f, 0.0f);
+	g_WorldMatrix[1] = g_WorldMatrix[1] * R;
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &g_WorldMatrix[1]);
+	g_teapot->DrawSubset(0);
+
+	// 进行圆环的绘制
+	D3DXMatrixTranslation(&g_WorldMatrix[2], 3.0f, 3.0f, 0.0f);
+	g_WorldMatrix[2] = g_WorldMatrix[2] * R;
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &g_WorldMatrix[2]);
+	g_torus->DrawSubset(0);
+
+	// 进行球面体的绘制
+	D3DXMatrixTranslation(&g_WorldMatrix[3], -3.0f, 3.0f, 0.0f);
+	g_WorldMatrix[3] = g_WorldMatrix[3] * R;
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &g_WorldMatrix[3]);
+	g_sphere->DrawSubset(0);
 
 	//在窗口右上角处，显示每秒帧数
 	int charCount = swprintf_s(g_strFPS, 20, _T("FPS:%0.3f"), Get_FPS());
 	g_pFont->DrawText(NULL, g_strFPS, charCount, &formatRect, DT_TOP | DT_RIGHT, D3DCOLOR_XRGB(255, 39, 136));
+
 
 	//--------------------------------------------------------------------------------------
 	// 【Direct3D渲染五步曲之四】：结束绘制
@@ -424,9 +373,10 @@ float Get_FPS()
 void Direct3D_CleanUp()
 {
 	//释放COM接口对象
-	SAFE_RELEASE(g_pIndexBuffer);
-	SAFE_RELEASE(g_pVertexBuffer);
+	SAFE_RELEASE(g_torus);
+	SAFE_RELEASE(g_sphere);
+	SAFE_RELEASE(g_cube);
+	SAFE_RELEASE(g_teapot);
 	SAFE_RELEASE(g_pFont);
 	SAFE_RELEASE(g_pd3dDevice);
 }
-
